@@ -27,7 +27,7 @@ The two datasets are connected at the council-district level, enabling analysis 
 
 This project follows a medallion (Bronze → Silver → Gold) lakehouse architecture, built entirely on Databricks with Delta Lake and Unity Catalog.
 
-![Architecture Diagram](powerbi/la_lakehouse_arc.drawio.png)
+![Architecture Diagram](powerbi/lakehouse_arc.draw.io.png)
 
 **Pipeline orchestration**: The full Bronze → Silver → Gold flow is automated as a Databricks Job with explicit task dependencies (see [Pipeline Orchestration](#pipeline-orchestration) below), scheduled to run monthly.
 
