@@ -19,9 +19,9 @@ A structured + unstructured data engineering project connecting Los Angeles buil
 This project ingests, cleans, and models two distinct LA city data sources into a unified Bronze → Silver → Gold lakehouse architecture:
 
 - **Structured data**: 405,688 building permits pulled from the LA Open Data Socrata API, modeled into a star schema with 9 dimension tables and a central fact table.
-- **Unstructured data**: 337 Planning & Land Use Management (PLUM) committee meeting agendas, discovered through API reverse-engineering, downloaded as PDFs, and parsed via regex-based text extraction into 7,985 structured agenda-item records.
+- **Unstructured data**: 337 Planning & Land Use Management (PLUM) committee meeting agendas, discovered through API reverse-engineering, downloaded as PDFs, and parsed via regex-based text extraction into 7,985 structured agenda-item records, spanning 112 distinct meeting documents at the Gold layer.
 
-The two datasets are connected at the council-district level, enabling analysis of both routine permit activity and committee-level case review across all 15 LA council districts, spanning 2016–2026. The project answers 25 analytical questions (21 structured, 4 unstructured) and is orchestrated as a scheduled Databricks Job with explicit task dependencies.
+The two datasets are connected at the council-district level, enabling analysis of both routine permit activity and committee-level case review across all 15 LA council districts, spanning 2016–2026. The project is orchestrated as a scheduled Databricks Job with explicit task dependencies and visualized through a 4-page Power BI dashboard.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ This project follows a medallion (Bronze → Silver → Gold) lakehouse architec
 - Databricks Jobs & Pipelines (scheduled, dependency-managed multi-task workflow)
 
 **Visualization**
-- Power BI (7-page interactive dashboard)
+- Power BI (4-page interactive dashboard)
 
 ## Data Sources
 
@@ -88,46 +88,38 @@ Both the `cnc` (neighborhood council) and `cpa` (Community Plan Area) fields con
 
 ## Key Findings
 
-A selection of headline insights from the 25 analytical questions answered in this project (full list of questions and views in the `gold/` notebooks):
+Headline insights from the four dashboard pages:
 
-**Structured — Permits**
-- ADU (Accessory Dwelling Unit) permits show the largest positive share shift of any land-use category between 2021 and 2025, consistent with statewide ADU policy changes over that period.
-- Approval velocity varies significantly by permit type — new building construction takes substantially longer to approve than lower-complexity permits like signage, as expected.
-- A small number of council districts and Community Plan Areas show disproportionate growth acceleration; most districts showed decelerating permit growth in 2025, with Districts 11 and 15 as notable exceptions.
+**Permit Operations & Bottlenecks**
+- Approval times vary meaningfully by council district — roughly an 80-day spread between the fastest and slowest districts.
+- The vast majority of permits (99%+) resolve normally; a small number of specific statuses (e.g., "Intent to Correct CofC") account for permits stuck unresolved for extremely long periods, in some cases years.
 
-**Unstructured — PLUM Committee Activity**
+**Growth Trends & Economic Valuation**
+- ADU (Accessory Dwelling Unit) permits show the largest positive land-use share shift between 2021 and 2025, consistent with statewide ADU policy changes over that period.
+- Total permit valuation varies substantially by council district, with a small number of districts accounting for a disproportionate share of citywide development value.
+
+**PLUM Committee Activity**
 - PLUM agenda items split nearly evenly between case-level (zoning/CEQA review, 58.5%) and policy-level (procedural/ordinance, 41.5%) matters.
 - Case-level items are continued to a future meeting roughly 4x more often than policy-level items (~12% vs. ~3%), consistent with the greater complexity and stakeholder involvement typical of case review.
-- Case-level items are far more likely to report a fiscal impact (~45%) than policy-level items (~9%).
-- Community Impact Statement submission rates nearly doubled from their low point in 2023 (9.3%) to 2025 (17.7%), though rates remain modest overall — the large majority of PLUM items proceed without formal neighborhood council input.
 
 **Structured + Unstructured Combined**
 - District-level PLUM agenda activity shows no meaningful correlation with permit volume 1–3 months later (correlation ≈ -0.03 to -0.04 across all lags tested), suggesting PLUM caseload and citywide permit activity represent largely distinct planning processes — the vast majority of routine permits never require PLUM committee review.
 
 ## Dashboard
 
-A 7-page interactive Power BI dashboard built on top of the Gold layer, covering both structured and unstructured findings. Screenshots below (full-resolution images in [`/powerbi`](./powerbi)):
+A 4-page interactive Power BI dashboard built on top of the Gold layer, covering both structured and unstructured findings. Screenshots below (full-resolution images in [`/powerbi`](./powerbi)):
 
-**1. Overview** — project summary, KPIs, and district-level orientation
-![Overview](powerbi/la_lakehouse_overview.png)
+**1. Overview** — project KPIs, permit volume by district, and PLUM documents processed
+![Overview](powerbi/lakehouse_overview_n_understanding.png)
 
-**2. Permit Activity & Volume** — monthly trends, permit type growth, land-use category shifts
-![Permit Activity](powerbi/la_lakehouse_permit_activity.png)
+**2. Permit Operations & Processing Bottlenecks** — approval speed by district, permit pipeline status breakdown, and aging analysis for stuck permits
+![Permit Operations](powerbi/lakehouse_permit_operations_n_processing_bottlenecks.png)
 
-**3. Approval Velocity** — approval time by permit type, zone, district, and area planning commission
-![Approval Velocity](powerbi/la_lakehouse_approval_velocity.png)
+**3. Growth Trends & Economic Valuation** — land-use category share shift (2021 vs. 2025), net category growth, and valuation by council district
+![Growth Trends](powerbi/lakehouse_growth_trends_n_economic_valuation.png)
 
-**4. Geographic Concentration** — growth acceleration by district and Community Plan Area
-![Geographic Concentration](powerbi/la_lakehouse_geographic_concentration.png)
-
-**5. Land Use & Valuation** — ADU growth, zoning density, valuation by district/zone/year/census tract
-![Land Use & Valuation](powerbi/la_lakehouse_land_use_valuation.png)
-
-**6. Special Dimensions** — hillside development comparison, neighborhood council investment, active pipeline health
-![Special Dimensions](powerbi/la_lakehouse_special_dimensions.png)
-
-**7. PLU/PLUM Findings** — unstructured data analysis and the structured/unstructured correlation finding
-![PLU/PLUM Findings](powerbi/la_lakehouse_plu_plum_findings.png)
+**4. PLUM Findings** — case-level vs. policy-level item split, continuation rates, and the structured/unstructured correlation analysis
+![PLUM Findings](powerbi/lakehouse_plum_findings.png)
 
 ## Pipeline Orchestration
 
@@ -138,7 +130,7 @@ The full PLU/PLUM pipeline (Bronze ingestion → Silver extraction → Gold tabl
 2. `silver_plu_extraction` — parses PDFs into structured agenda-item records *(depends on 1)*
 3. `gold_fact_plum_items_create` — creates the Gold fact table schema *(depends on 2)*
 4. `gold_fact_plum_items_populated` — merges Silver data into the Gold fact table, joined against `dim_district` *(depends on 3)*
-5. `gold_plu_view` — builds the 5 PLU analytical views *(depends on 4)*
+5. `gold_plu_view` — builds the PLU analytical views *(depends on 4)*
 
 **Compute**: Serverless
 **Schedule**: Monthly, automatically re-ingesting new PLUM meetings and permits as they become available from LA's open data sources
@@ -153,13 +145,9 @@ The full PLU/PLUM pipeline (Bronze ingestion → Silver extraction → Gold tabl
 
 **Setup**
 1. Clone this repository
-
 2. Create a Unity Catalog schema structure: `la_lakehouse.bronze`, `la_lakehouse.silver`, `la_lakehouse.gold`
-
 3. Store your Socrata app token securely in Databricks Secrets (via the Databricks CLI or Workspace Settings → Secrets UI) — do not hardcode credentials in notebooks
-
 4. Run notebooks in order: `bronze/` → `silver/` → `gold/` (dim → fact → populate → views), or use the pre-configured Databricks Job (see [Pipeline Orchestration](#pipeline-orchestration)) to run the PLU pipeline end-to-end
-
 5. Connect Power BI Desktop to your Databricks SQL Warehouse via the built-in Databricks connector, authenticating with a Databricks Personal Access Token (generate under **Settings → Developer → Access Tokens**, scope: BI Tools)
 
 **Credentials & Secrets**: This project uses the LA Open Data Socrata API (requires a free app token) and a Databricks Personal Access Token for Power BI connectivity. Both are stored securely via Databricks Secrets rather than hardcoded in notebooks or committed to version control.
